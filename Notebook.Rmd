@@ -29,16 +29,36 @@ length(which(lengths(recipes$categories) == 0))
 length(which(lengths(recipes$directions) == 0))
 length(which(lengths(recipes$ingredients) == 0))
 length(which(recipes$calories > sd(recipes$calories, na.rm=TRUE) * 3))
-length(is.na(recipes$calories))
-length(is.na(recipes$protein))
-length(is.na(recipes$fat))
-length(is.na(recipes$sodium))
-length(is.na(recipes$rating))
+length(which(is.na(recipes$calories)))
+length(which(is.na(recipes$protein)))
+length(which(is.na(recipes$fat)))
+length(which(is.na(recipes$sodium)))
+length(which(is.na(recipes$rating)))
+
+recipes = recipes %>% add_count(title, desc, rating, date, calories) %>% filter(n == 1) %>% select(-'n')
 
 recipes = recipes %>% 
   filter(lengths(categories) > 0) %>%
   filter(!is.na(calories)) %>%
   filter(calories < sd(calories, na.rm=TRUE) * 3)
+
+```
+
+Binarize the numeric variables
+```{r}
+createBins = function(var, count){
+  breaks = quantile(var, probs = seq(0, 1, 1/count), names = T, na.rm = T)
+  cuts = cut(var, breaks=breaks, right = FALSE)
+  return (cuts)
+}
+
+recipes$caloriesBin = createBins(recipes$calories, 5)
+recipes$proteinBin = createBins(recipes$protein, 5)
+recipes$fatBin = createBins(recipes$fat, 5)
+recipes$sodiumBin = createBins(recipes$sodium, 5)
+recipes$ratingBin = createBins(recipes$rating, 3)
+recipes$numOfIngredients = lengths(recipes$ingredients)
+recipes$numOfDirections = lengths(recipes$directions)
 
 ```
 
@@ -93,16 +113,26 @@ Quer praticidade?
 Horário do dia
 
 
+
 ```{r}
+
+
+
 rankRating = recipes %>%
   filter(calories >= median(calories)/1.5 
          & calories <= median(calories) * 1.5
          & sodium < 2000
+         & protein >= 3
          & lengths(ingredients) < 5
-         & rating >= 4) %>%
-  arrange(desc(protein), fat, lengths(directions))
+         & rating >= 4.38)
   #top_n(50, Median)
 
+rankRating = rankRating %>% 
+  arrange(desc(proteinBin), fatBin, numOfDirections) %>%
+  select('title','numOfIngredients', 'numOfDirections', 'proteinBin', 'caloriesBin', 'fatBin')
+
+rankRating[1:3, ]
+  
 ```
 
 
