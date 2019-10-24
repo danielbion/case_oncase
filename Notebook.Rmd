@@ -12,6 +12,8 @@ setwd(dir)
 library(tidyverse)
 library(jsonlite)
 library(ggthemes)
+library(httr)
+
 ```
 
 
@@ -24,6 +26,9 @@ recipes = as_tibble(recipesJson)
 
 Remove outliers/data with missing category or calorie
 
+Extract Date/time 
+TO-DO
+
 ```{r}
 length(which(lengths(recipes$categories) == 0))
 length(which(lengths(recipes$directions) == 0))
@@ -35,7 +40,7 @@ length(which(is.na(recipes$fat)))
 length(which(is.na(recipes$sodium)))
 length(which(is.na(recipes$rating)))
 
-recipes = recipes %>% add_count(title, desc, rating, date, calories) %>% filter(n == 1) %>% select(-'n')
+recipes = recipes[!duplicated(recipes[,c('title', 'desc', 'date')]),]
 
 recipes = recipes %>% 
   filter(lengths(categories) > 0) %>%
@@ -47,9 +52,9 @@ recipes = recipes %>%
 Binarize the numeric variables
 ```{r}
 createBins = function(var, count){
-  breaks = quantile(var, probs = seq(0, 1, 1/count), names = T, na.rm = T)
-  cuts = cut(var, breaks=breaks, right = FALSE)
-  return (cuts)
+	breaks = quantile(var, probs = seq(0, 1, 1/count), names = T, na.rm = T)
+	cuts = cut(var, breaks=breaks, right = FALSE)
+	return (cuts)
 }
 
 recipes$caloriesBin = createBins(recipes$calories, 5)
@@ -109,8 +114,8 @@ If you had to recommend 3 recipes based on the data, what would they be?
 Depending on the client profile
 
 Healthy
-Quer praticidade?
-Horário do dia
+Quick and easy
+Lunch/Breakfast/Dinner
 
 
 
@@ -134,5 +139,57 @@ rankRating = rankRating %>%
 rankRating[1:3, ]
   
 ```
+Considering the categories of the top 100 recipes under review, how many recipes are currently on the site https://www.epicurious.com for each category
+
+```{r}
+
+removeAccent = function(str){
+  symbols = c(acute = 'áéíóúÁÉÍÓÚıİ', grave = 'àèìòùÀÈÌÒÙ', circunflex = 'âêîôûÂÊÎÔÛ',
+      tilde = 'ãõÃÕñÑ', umlaut = 'äëïöüÄËÏÖÜÿ', cedil = 'çÇ')
+  
+  nudeSymbols = c(acute = 'aeiouAEIOUyY',grave = 'aeiouAEIOU',circunflex = 'aeiouAEIOU',
+      tilde = 'aoAOnN',umlaut = 'aeiouAEIOUy',cedil = 'cC')
+  
+  punct = c(',', '\\.', '\\?', '-', ':', ';', '/')
+  for (i in 1:length(punct)){
+      str = gsub(punct[i], ' ', str)
+  }
+  punct = c('\'')
+  for (i in 1:length(punct)){
+      str = gsub(punct[i], '', str)
+  }
+  return(chartr(paste(symbols, collapse = ''), paste(nudeSymbols, collapse = ''), str))
+}
+
+searchByCategory = function(category){
+  category = removeAccent(category)
+  category = gsub(' ', '%20', category)
+  content = GET(paste0('https://www.epicurious.com/search/', category))
+  startIndex = str_locate(content,'<span class="matching-count" data-reactid="39">')[2] + 1
+  filteredContent1 = substring(content, startIndex)
+  
+  endIndex = str_locate(filteredContent1,'</span>')[1] - 1
+  text = substring(filteredContent1, 0, endIndex)
+  count = as.numeric(gsub(',', '', text))
+  return (count)
+}
+
+topRecipesByRating = recipes %>%
+  arrange(desc(rating))
+
+topRecipesByRating = topRecipesByRating[1:100,]
+
+categories = topRecipesByRating %>%
+  select('categories') %>% 
+  unnest(categories)
+
+categories = categories[!duplicated(categories),]
+categories$count = sapply(categories$categories, searchByCategory)
+saveRDS(categories, 'categories.rds')
+categories <- readRDS('categories.rds')
+
+
+```
+
 
 
