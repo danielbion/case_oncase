@@ -71,7 +71,7 @@ Estimate a calorie/protein/fat approximation based on the ingredients
 
 TO-DO
 
-Which categories belong to the most caloric foods?
+1. Which categories belong to the most caloric foods?
 
 ```{r}
 rankCalories = recipes %>%
@@ -97,7 +97,7 @@ ggplot(rankCalories, aes(x = reorder(categories, Median),
 
 ```
 
-What are the top 10 ingredients contained in the most calorie recipes?
+2. What are the top 10 ingredients contained in the most calorie recipes?
 ```{r}
 
 rankCalories = recipes %>%
@@ -110,7 +110,7 @@ rankCalories = recipes %>%
 rankCalories
 ```
 
-If you had to recommend 3 recipes based on the data, what would they be?
+3. If you had to recommend 3 recipes based on the data, what would they be?
 Depending on the client profile
 
 Healthy
@@ -139,7 +139,36 @@ rankRating = rankRating %>%
 rankRating[1:3, ]
   
 ```
-Considering the categories of the top 100 recipes under review, how many recipes are currently on the site https://www.epicurious.com for each category
+
+4. Does any feature present in the data determine the high grade of a recipe?
+Note: I did a review on the site, you can choose between 0 and 4 forks (stars). Was that scaled to 0-5 range?
+
+```{r}
+plotCalories = ggplot(recipes, aes(x = rating, y = calories)) +
+  geom_bar(stat = "summary", fun.y = "median") 
+
+plotFat = ggplot(recipes, aes(x = rating, y = fat)) +
+  geom_bar(stat = "summary", fun.y = "median") 
+
+plotProtein = ggplot(recipes, aes(x = rating, y = protein)) +
+  geom_bar(stat = "summary", fun.y = "median") 
+
+plotSodium = ggplot(recipes, aes(x = rating, y = sodium)) +
+  geom_bar(stat = "summary", fun.y = "median") 
+
+plotIngredients = ggplot(recipes, aes(x = rating, y = numOfIngredients)) +
+  geom_bar(stat = "summary", fun.y = "mean") 
+
+plotDirections = ggplot(recipes, aes(x = rating, y = numOfDirections)) +
+  geom_bar(stat = "summary", fun.y = "mean") 
+
+grid.arrange(plotCalories, plotFat, plotProtein, plotSodium, plotIngredients, plotDirections, ncol=3)
+
+
+```
+
+
+5. Considering the categories of the top 100 recipes under review, how many recipes are currently on the site https://www.epicurious.com for each category
 
 ```{r}
 
@@ -184,8 +213,8 @@ categories = topRecipesByRating %>%
   unnest(categories)
 
 categories = categories[!duplicated(categories),]
-categories$count = sapply(categories$categories, searchByCategory)
-saveRDS(categories, 'categories.rds')
+#categories$count = sapply(categories$categories, searchByCategory)
+#saveRDS(categories, 'categories.rds')
 categories <- readRDS('categories.rds')
 
 
