@@ -13,6 +13,7 @@ library(tidyverse)
 library(jsonlite)
 library(ggthemes)
 library(httr)
+library(gridExtra)
 
 ```
 
@@ -24,23 +25,14 @@ recipesJson = stream_in(file('receitas.json'))
 recipes = as_tibble(recipesJson)
 ```
 
-Remove outliers/data with missing category or calorie
-
-Extract Date/time 
-TO-DO
+Remove duplicated data, outliers, data with missing values
 
 ```{r}
-length(which(lengths(recipes$categories) == 0))
-length(which(lengths(recipes$directions) == 0))
-length(which(lengths(recipes$ingredients) == 0))
-length(which(recipes$calories > sd(recipes$calories, na.rm=TRUE) * 3))
-length(which(is.na(recipes$calories)))
-length(which(is.na(recipes$protein)))
-length(which(is.na(recipes$fat)))
-length(which(is.na(recipes$sodium)))
-length(which(is.na(recipes$rating)))
-
 recipes = recipes[!duplicated(recipes[,c('title', 'desc', 'date')]),]
+
+recipes$date = as.Date(recipes$date)
+recipes$numOfIngredients = lengths(recipes$ingredients)
+recipes$numOfDirections = lengths(recipes$directions)
 
 recipes = recipes %>% 
   filter(lengths(categories) > 0) %>%
@@ -49,27 +41,6 @@ recipes = recipes %>%
 
 ```
 
-Binarize the numeric variables
-```{r}
-createBins = function(var, count){
-	breaks = quantile(var, probs = seq(0, 1, 1/count), names = T, na.rm = T)
-	cuts = cut(var, breaks=breaks, right = FALSE)
-	return (cuts)
-}
-
-recipes$caloriesBin = createBins(recipes$calories, 5)
-recipes$proteinBin = createBins(recipes$protein, 5)
-recipes$fatBin = createBins(recipes$fat, 5)
-recipes$sodiumBin = createBins(recipes$sodium, 5)
-recipes$ratingBin = createBins(recipes$rating, 3)
-recipes$numOfIngredients = lengths(recipes$ingredients)
-recipes$numOfDirections = lengths(recipes$directions)
-
-```
-
-Estimate a calorie/protein/fat approximation based on the ingredients
-
-TO-DO
 
 1. Which categories belong to the most caloric foods?
 
@@ -81,7 +52,6 @@ rankCalories = recipes %>%
   arrange(desc(Median)) %>%
   filter(Count > 1) %>%
   top_n(20, Median)
-rankCalories
   
 ggplot(rankCalories, aes(x = reorder(categories, Median), 
   y = Median, fill = Median)) +
@@ -91,9 +61,6 @@ ggplot(rankCalories, aes(x = reorder(categories, Median),
   coord_flip() +
   scale_fill_continuous(low="orange", high="red") +
   theme_few()
-
-#goose = recipes %>% filter(str_detect(categories, 'Goose'))
-
 
 ```
 
@@ -107,34 +74,40 @@ rankCalories = recipes %>%
   arrange(desc(Median)) %>%
   top_n(10, Median)
 
-rankCalories
+rankCalories %>% select('ingredients')
 ```
 
 3. If you had to recommend 3 recipes based on the data, what would they be?
-Depending on the client profile
 
-Healthy
-Quick and easy
-Lunch/Breakfast/Dinner
+Depending on the client profile:
 
+* Healthy
+* Quick and easy
+* Lunch/Breakfast/Dinner
 
+A recommendation for me:
 
+* Balanced amount of calories;
+* Sodium intake below daily recommended;
+* Amount of protein above the median;
+* Rating in the best quantile;
+* Less than 5 ingredients for preparation;
+* Removed drinks.
 ```{r}
-
-
 
 rankRating = recipes %>%
   filter(calories >= median(calories)/1.5 
          & calories <= median(calories) * 1.5
          & sodium < 2000
-         & protein >= 3
+         & protein >= 9
          & lengths(ingredients) < 5
+         & !str_detect(categories, 'Drink')
          & rating >= 4.38)
-  #top_n(50, Median)
+
 
 rankRating = rankRating %>% 
-  arrange(desc(proteinBin), fatBin, numOfDirections) %>%
-  select('title','numOfIngredients', 'numOfDirections', 'proteinBin', 'caloriesBin', 'fatBin')
+  arrange(desc(protein), numOfDirections) %>%
+  select('title','numOfIngredients', 'numOfDirections', 'protein', 'calories', 'fat')
 
 rankRating[1:3, ]
   
@@ -216,7 +189,7 @@ categories = categories[!duplicated(categories),]
 #categories$count = sapply(categories$categories, searchByCategory)
 #saveRDS(categories, 'categories.rds')
 categories <- readRDS('categories.rds')
-
+categories %>% arrange (desc(count))
 
 ```
 
