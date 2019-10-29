@@ -14,20 +14,21 @@ library(jsonlite)
 library(ggthemes)
 library(httr)
 library(gridExtra)
+library(mlr)
 
 ```
 
 
 Load the database
 
-```{r, message = FALSE, warning=FALSE}
+```{r, include=FALSE}
 recipesJson = stream_in(file('receitas.json'))
 recipes = as_tibble(recipesJson)
 ```
 
 Remove duplicated data, outliers, data with missing values
 
-```{r}
+```{r include=FALSE}
 recipes = recipes[!duplicated(recipes[,c('title', 'desc', 'date')]),]
 
 recipes$date = as.Date(recipes$date)
@@ -116,18 +117,20 @@ rankRating[1:3, ]
 4. Does any feature present in the data determine the high grade of a recipe?
 Note: I did a review on the site, you can choose between 0 and 4 forks (stars). Was that scaled to 0-5 range?
 
-```{r}
+* The more detailed the directions, better is the rating.
+
+```{r message=FALSE, warning=FALSE}
 plotCalories = ggplot(recipes, aes(x = rating, y = calories)) +
-  geom_bar(stat = "summary", fun.y = "median") 
+  geom_bar(stat = "summary", fun.y = "mean") 
 
 plotFat = ggplot(recipes, aes(x = rating, y = fat)) +
-  geom_bar(stat = "summary", fun.y = "median") 
+  geom_bar(stat = "summary", fun.y = "mean") 
 
 plotProtein = ggplot(recipes, aes(x = rating, y = protein)) +
-  geom_bar(stat = "summary", fun.y = "median") 
+  geom_bar(stat = "summary", fun.y = "mean") 
 
 plotSodium = ggplot(recipes, aes(x = rating, y = sodium)) +
-  geom_bar(stat = "summary", fun.y = "median") 
+  geom_bar(stat = "summary", fun.y = "mean") 
 
 plotIngredients = ggplot(recipes, aes(x = rating, y = numOfIngredients)) +
   geom_bar(stat = "summary", fun.y = "mean") 
@@ -156,7 +159,7 @@ removeAccent = function(str){
   for (i in 1:length(punct)){
       str = gsub(punct[i], ' ', str)
   }
-  punct = c('\'')
+  punct = c('\'', '&', '+', '#', '\uFFFD')
   for (i in 1:length(punct)){
       str = gsub(punct[i], '', str)
   }
@@ -193,5 +196,74 @@ categories %>% arrange (desc(count))
 
 ```
 
+6. Build a classifier to recommend tags (categories) for recipes:
 
+
+```{r}
+
+removeSpace = function(str){
+  return (gsub(' ', '', str))
+}
+
+removeNumbers = function(str){
+  numbers = '0123456789'
+  return(removeSpace(chartr(numbers, paste(rep(' ', nchar(numbers)), collapse = ''), str)))
+}
+
+set.seed(1)
+recipesSample = recipes[sample(nrow(recipes), 1000), ]
+
+recipesSample$categoriesUpper = lapply(recipesSample$categories, toupper)
+recipesSample$categoriesUpper = lapply(recipesSample$categoriesUpper, removeAccent)
+recipesSample$categoriesUpper = lapply(recipesSample$categoriesUpper, removeNumbers)
+
+labels = recipesSample %>%
+  select('categoriesUpper') %>% 
+  unnest(categoriesUpper)
+
+labels = labels %>% add_count(categoriesUpper) %>% filter(n >= 5) %>% select('categoriesUpper')
+labels = labels[!duplicated(labels$categoriesUpper),]
+labels = labels$categoriesUpper
+
+
+df = data.frame(matrix(ncol = length(labels), nrow = 0))
+names(df) = labels
+
+
+for(i in 1:nrow(recipesSample)){
+   for(j in 1:length(labels)){
+       df[i, j] = str_detect(string = recipesSample$categoriesUpper[i], pattern = labels[[j]])
+   }
+}
+
+recipesSample = recipesSample %>%
+  select('fat', 'calories', 'protein', 'rating', 'sodium', 'numOfIngredients', 'numOfDirections')
+data = cbind(recipesSample, df)
+
+
+task = makeMultilabelTask(data = data, target = unlist(labels))
+
+binary.learner = makeLearner("classif.rpart")
+lrncc = makeMultilabelClassifierChainsWrapper(binary.learner)
+
+n = getTaskSize(task)
+train.set = seq(1, n, by = 2)
+test.set = seq(2, n, by = 2)
+
+scene.mod.cc = train(lrncc, task, subset = train.set)
+scene.pred.cc = predict(scene.mod.cc, task = task, subset = test.set)
+
+listMeasures("multilabel")
+performance(scene.pred.cc, measures = list(multilabel.hamloss, multilabel.subset01, multilabel.f1, multilabel.acc))
+
+lrnbr = makeMultilabelBinaryRelevanceWrapper(binary.learner)
+
+scene.mod.br = train(lrnbr, task, subset = train.set)
+scene.pred.br = predict(scene.mod.br, task = task, subset = test.set)
+
+performance(scene.pred.br, measures = list(multilabel.hamloss, multilabel.subset01, multilabel.f1, multilabel.acc))
+
+
+
+```
 
