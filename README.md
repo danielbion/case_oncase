@@ -31,7 +31,7 @@ The challenge focused on the analysis of the receitas.json dataset to derive ins
 
 The challenge aimed to identify individuals capable of turning data into actionable insights, promoting a culture of analytical excellence at Oncase. It sought to uncover not only technical skills but also creativity, critical thinking, and strategic data utilization for real-world problem-solving.
 
-Full instructions in original Readme file [here](https://github.com/danielbion/case_oncase/blob/master/data-scientist.md)
+Full instructions in original Readme file [here](https://github.com/danielbion/case_oncase/blob/master/data-scientist.md).
 
-Code [here](https://github.com/danielbion/case_oncase/blob/master/Notebook.nb.html)
+Code [here](https://github.com/danielbion/case_oncase/blob/master/Notebook.nb.html).
 
